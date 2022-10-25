@@ -3,6 +3,7 @@ package build
 
 import (
 	"context"
+	"github.com/theketchio/ketch/internal/docker"
 	"os"
 
 	"github.com/theketchio/ketch/internal/errors"
@@ -27,6 +28,8 @@ type CreateImageFromSourceRequest struct {
 	// defaults to current working directory, use WithWorkingDirectory to override. Typically the
 	// working directory would be the root of the source code that will be built.
 	workingDir string
+	// Dockerfile to be used to build an image
+	dockerfile string
 }
 
 // Option is the signature of options used in GetSourceHandler
@@ -36,6 +39,13 @@ type Option func(o *CreateImageFromSourceRequest)
 func WithWorkingDirectory(workingDirectory string) Option {
 	return func(o *CreateImageFromSourceRequest) {
 		o.workingDir = workingDirectory
+	}
+}
+
+// WithDockerfile override the current dockerfile
+func WithDockerfile(dockerfile string) Option {
+	return func(o *CreateImageFromSourceRequest) {
+		o.dockerfile = dockerfile
 	}
 }
 
@@ -61,6 +71,35 @@ func GetSourceHandler(packCLI builder) func(context.Context, *CreateImageFromSou
 			BuildPacks: req.BuildPacks,
 		}
 		if err := packCLI.BuildAndPushImage(ctx, packRequest); err != nil {
+			return errors.Wrap(err, "could not build image from source")
+		}
+
+		return nil
+	}
+}
+
+// GetDockerfileHandler returns a build function. It takes a pack client as an argument.
+func GetDockerfileHandler(dockerCLI *docker.Client) func(context.Context, *CreateImageFromSourceRequest, ...Option) error {
+	return func(ctx context.Context, req *CreateImageFromSourceRequest, opts ...Option) error {
+		// default to current working directory
+		wd, err := os.Getwd()
+		if err != nil {
+			return errors.Wrap(err, "could not get working directory")
+		}
+
+		req.workingDir = wd
+
+		for _, opt := range opts {
+			opt(req)
+		}
+
+		packRequest := docker.BuildRequest{
+			Image:      req.Image,
+			WorkingDir: req.workingDir,
+			Dockerfile: req.dockerfile,
+		}
+
+		if err := dockerCLI.BuildAndPushImage(ctx, packRequest); err != nil {
 			return errors.Wrap(err, "could not build image from source")
 		}
 

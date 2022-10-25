@@ -35,6 +35,7 @@ const (
 	FlagRegistrySecret     = "registry-secret"
 	FlagBuilder            = "builder"
 	FlagBuildPacks         = "build-packs"
+	FlagDockerfile         = "dockerfile"
 	FlagVolume             = "volume"
 	FlagVolumeMountPath    = "volume-mount-path"
 	FlagVolumeMountOptions = "volume-mount-options"
@@ -49,6 +50,7 @@ const (
 	FlagDescriptionShort = "d"
 	FlagEnvironmentShort = "e"
 	FlagNamespaceShort   = "n"
+	FlagDockerfileShort  = "f"
 
 	defaultYamlFile = "ketch.yaml"
 )
@@ -66,6 +68,8 @@ type Services struct {
 	KubeClient kubernetes.Interface
 	// Builder references source builder from internal/builder package
 	Builder SourceBuilderFn
+	// Dockerfile Builder references source builder from internal/builder package
+	DockerfileBuilder SourceBuilderFn
 	// Function that retrieve image config
 	GetImageConfig GetImageConfigFn
 	// Wait is a function that will wait until it detects the a deployment is finished
@@ -89,6 +93,7 @@ type Options struct {
 	Timeout                 string
 	AppSourcePath           string
 	SubPaths                []string
+	Dockerfile              string
 
 	Description          string
 	Envs                 []string
@@ -111,6 +116,7 @@ type ChangeSet struct {
 	yamlStrictDecoding   bool
 	sourcePath           *string
 	image                *string
+	dockerfile           *string
 	namespace            *string
 	ketchYamlFileName    *string
 	steps                *int
@@ -153,6 +159,9 @@ func (o Options) GetChangeSet(flags *pflag.FlagSet) *ChangeSet {
 	m := map[string]func(c *ChangeSet){
 		FlagImage: func(c *ChangeSet) {
 			c.image = &o.Image
+		},
+		FlagDockerfile: func(c *ChangeSet) {
+			c.dockerfile = &o.Dockerfile
 		},
 		FlagKetchYaml: func(c *ChangeSet) {
 			c.ketchYamlFileName = &o.KetchYamlFileName
@@ -249,6 +258,16 @@ func (c *ChangeSet) getSourceDirectory() (string, error) {
 		return "", err
 	}
 	return *c.sourcePath, nil
+}
+
+func (c *ChangeSet) getDockerfile() (string, error) {
+	if c.dockerfile == nil {
+		return "", newMissingError(FlagDockerfile)
+	}
+	if err := fileExists(*c.dockerfile); err != nil {
+		return "", err
+	}
+	return *c.dockerfile, nil
 }
 
 func (c *ChangeSet) getImage() (string, error) {

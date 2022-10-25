@@ -180,6 +180,14 @@ func validateSourceDeploy(cs *ChangeSet) error {
 	return nil
 }
 
+func validateDockerfileDeploy(cs *ChangeSet) error {
+	_, err := cs.getDockerfile()
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
 func validateCreateApp(ctx context.Context, client Client, appName string, cs *ChangeSet) error {
 	if !validation.ValidateName(appName) {
 		return fmt.Errorf("app name %q is not valid. name must start with "+
@@ -207,6 +215,20 @@ func directoryExists(dir string) error {
 	}
 	if !fi.IsDir() {
 		return fmt.Errorf("%w not a directory", newInvalidValueError(dir))
+	}
+	return nil
+}
+
+func fileExists(file string) error {
+	fi, err := os.Stat(file)
+	if os.IsNotExist(err) {
+		return fmt.Errorf("%w file doesn't exist", newInvalidValueError(file))
+	}
+	if err != nil {
+		return kerrs.Wrap(err, "test for file failed")
+	}
+	if fi.IsDir() {
+		return fmt.Errorf("%w not a file", newInvalidValueError(file))
 	}
 	return nil
 }

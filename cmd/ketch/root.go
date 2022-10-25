@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/theketchio/ketch/internal/docker"
 	"io"
 
 	"github.com/spf13/cobra"
@@ -23,7 +24,7 @@ type config interface {
 }
 
 // RootCmd represents the base command when called without any subcommands
-func newRootCmd(cfg config, out io.Writer, packSvc *pack.Client, ketchConfig configuration.KetchConfig) *cobra.Command {
+func newRootCmd(cfg config, out io.Writer, packSvc *pack.Client, dockerSvc *docker.Client, ketchConfig configuration.KetchConfig) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:           "ketch",
 		Short:         "Manage your applications and your cloud resources",
@@ -34,7 +35,7 @@ func newRootCmd(cfg config, out io.Writer, packSvc *pack.Client, ketchConfig con
 			return cmd.Usage()
 		},
 	}
-	cmd.AddCommand(newAppCmd(cfg, out, packSvc, ketchConfig.DefaultBuilder))
+	cmd.AddCommand(newAppCmd(cfg, out, packSvc, dockerSvc, ketchConfig.DefaultBuilder))
 	cmd.AddCommand(newBuilderCmd(ketchConfig, out))
 	cmd.AddCommand(newCnameCmd(cfg, out))
 	cmd.AddCommand(newEnvCmd(cfg, out))

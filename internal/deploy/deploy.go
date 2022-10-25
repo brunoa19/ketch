@@ -109,6 +109,13 @@ func getUpdatedApp(ctx context.Context, client Client, cs *ChangeSet) (*ketchv1.
 		}
 		app = a
 
+		if cs.dockerfile != nil {
+			if err := validateDockerfileDeploy(cs); err != nil {
+				return err
+			}
+			changed = true
+		}
+
 		if cs.sourcePath != nil {
 			if err := validateSourceDeploy(cs); err != nil {
 				return err
@@ -210,6 +217,17 @@ func buildFromSource(ctx context.Context, svc *Services, app *ketchv1.App, appNa
 	)
 }
 
+func buildFromDockerfile(ctx context.Context, svc *Services, appName, image, dockerFile string) error {
+	return svc.DockerfileBuilder(
+		ctx,
+		&build.CreateImageFromSourceRequest{
+			Image:   image,
+			AppName: appName,
+		},
+		build.WithDockerfile(dockerFile),
+	)
+}
+
 func deployImage(ctx context.Context, svc *Services, app *ketchv1.App, params *ChangeSet) error {
 	ketchYaml, err := params.getKetchYaml()
 	if err != nil {
@@ -228,6 +246,15 @@ func deployImage(ctx context.Context, svc *Services, app *ketchv1.App, params *C
 		sourcePath, _ := params.getSourceDirectory()
 		if err := buildFromSource(ctx, svc, app, params.appName, image, sourcePath); err != nil {
 			return errors.Wrap(err, "failed to build image from source path %q", sourcePath)
+		}
+	}
+
+	fromDockerfile := params.dockerfile != nil
+	// build image from source if valid path provided
+	if fromDockerfile {
+		dockerFile, _ := params.getDockerfile()
+		if err := buildFromDockerfile(ctx, svc, params.appName, image, dockerFile); err != nil {
+			return errors.Wrap(err, "failed to build image from Dockerfile %q", dockerFile)
 		}
 	}
 

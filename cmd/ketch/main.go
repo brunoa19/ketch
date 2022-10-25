@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/theketchio/ketch/internal/docker"
 	"log"
 	"os"
 
@@ -27,8 +28,12 @@ func main() {
 	if err != nil {
 		log.Fatalf("couldn't create pack service %q", err)
 	}
+	dockerSvc, err := docker.New(out)
+	if err != nil {
+		log.Fatalf("couldn't create docker pack service %q", err)
+	}
 
-	cmd := newRootCmd(&configuration.Configuration{}, out, packSvc, getKetchConfig())
+	cmd := newRootCmd(&configuration.Configuration{}, out, packSvc, dockerSvc, getKetchConfig())
 	if err := cmd.Execute(); err != nil {
 		log.Fatalf("Error: %v", err)
 	}

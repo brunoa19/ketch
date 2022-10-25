@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"github.com/theketchio/ketch/internal/docker"
 	"io"
 	"strings"
 
@@ -14,7 +15,7 @@ import (
 	"github.com/theketchio/ketch/internal/pack"
 )
 
-func newAppCmd(cfg config, out io.Writer, packSvc *pack.Client, configDefaultBuilder string) *cobra.Command {
+func newAppCmd(cfg config, out io.Writer, packSvc *pack.Client, dockerSvc *docker.Client, configDefaultBuilder string) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "app",
 		Short: "Manage applications",
@@ -25,12 +26,13 @@ func newAppCmd(cfg config, out io.Writer, packSvc *pack.Client, configDefaultBui
 	}
 
 	params := &deploy.Services{
-		Client:         cfg.Client(),
-		KubeClient:     cfg.KubernetesClient(),
-		Builder:        build.GetSourceHandler(packSvc),
-		GetImageConfig: deploy.GetImageConfig,
-		Wait:           deploy.WaitForDeployment,
-		Writer:         out,
+		Client:            cfg.Client(),
+		KubeClient:        cfg.KubernetesClient(),
+		Builder:           build.GetSourceHandler(packSvc),
+		DockerfileBuilder: build.GetDockerfileHandler(dockerSvc),
+		GetImageConfig:    deploy.GetImageConfig,
+		Wait:              deploy.WaitForDeployment,
+		Writer:            out,
 	}
 
 	cmd.AddCommand(newAppDeployCmd(cfg, params, configDefaultBuilder))

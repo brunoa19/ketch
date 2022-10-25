@@ -19,6 +19,7 @@ type Application struct {
 	Type           *string   `json:"type"`
 	Name           *string   `json:"name"`
 	Image          *string   `json:"image,omitempty"`
+	Dockerfile     *string   `json:"dockerfile,omitempty"`
 	Namespace      *string   `json:"namespace"`
 	Description    *string   `json:"description,omitempty"`
 	Environment    []string  `json:"environment,omitempty"`
@@ -97,6 +98,7 @@ func (o *Options) GetChangeSetFromYaml(filename string) (*ChangeSet, error) {
 		appVersion:           application.Version,
 		appType:              application.Type,
 		image:                application.Image,
+		dockerfile:           application.Dockerfile,
 		description:          application.Description,
 		namespace:            application.Namespace,
 		dockerRegistrySecret: application.RegistrySecret,

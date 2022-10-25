@@ -22,7 +22,7 @@ Details about Procfile conventions can be found here: https://devcenter.heroku.c
   but you can provide a custom path with --ketch-yaml.
 
 Deploy from an image:
-  ketch app deploy <app name> -i myregistry/myimage:latest
+  ketch app deploy <app name> -i myregistry/myimage:latest [-f ./Dockerfile]
 
 Users can deploy from image or source code by passing a filename such as app.yaml containing fields like:
 	name: test
@@ -56,6 +56,7 @@ func newAppDeployCmd(cfg config, params *deploy.Services, configDefaultBuilder s
 	}
 
 	cmd.Flags().StringVarP(&options.Image, deploy.FlagImage, deploy.FlagImageShort, "", "Name of the image to be deployed.")
+	cmd.Flags().StringVarP(&options.Dockerfile, deploy.FlagDockerfile, deploy.FlagDockerfileShort, "", "Path to the Dockerfile to build the image to be deployed.")
 	cmd.Flags().StringVar(&options.KetchYamlFileName, deploy.FlagKetchYaml, "", "Path to ketch.yaml.")
 
 	cmd.Flags().BoolVar(&options.StrictKetchYamlDecoding, deploy.FlagStrict, false, "Enforces strict decoding of ketch.yaml.")
