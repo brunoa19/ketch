@@ -3,7 +3,6 @@ package docker
 import (
 	"bufio"
 	"context"
-	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"github.com/buildpacks/pack/pkg/client"
@@ -14,7 +13,7 @@ import (
 	"github.com/google/go-containerregistry/pkg/name"
 	"github.com/pkg/errors"
 	"io"
-	"time"
+	"os/exec"
 )
 
 // BuildRequest contains parameters for the Build command
@@ -64,17 +63,23 @@ func (c *Client) BuildAndPushImage(ctx context.Context, req BuildRequest) error 
 	}
 
 	imageTag := ref.Name()
-
-	// build docker image
 	c.logger.Infof("Building image '%s' from Dockerfile '%s'", imageTag, req.Dockerfile)
+	if err := c.buildImage(ctx, req.WorkingDir, req.Dockerfile, imageTag); err != nil {
+		return err
+	}
+	c.logger.Infof("Building image '%s' completed successful", imageTag)
 
-	tar, err := archive.TarWithOptions(req.WorkingDir, &archive.TarOptions{})
+	return c.pushImageExec(ctx, imageTag)
+}
+
+func (c *Client) buildImage(ctx context.Context, workingDir, dockerfile, imageTag string) error {
+	tar, err := archive.TarWithOptions(workingDir, &archive.TarOptions{})
 	if err != nil {
 		return err
 	}
 
 	opts := types.ImageBuildOptions{
-		Dockerfile: req.Dockerfile, // "Dockerfile"
+		Dockerfile: dockerfile,
 		Tags:       []string{imageTag},
 		Remove:     true,
 	}
@@ -87,7 +92,6 @@ func (c *Client) BuildAndPushImage(ctx context.Context, req BuildRequest) error 
 	for scanner.Scan() {
 		lastLine = scanner.Text()
 		c.logger.Debug(scanner.Text())
-		//fmt.Println(scanner.Text())
 	}
 
 	errLine := &ErrorLine{}
@@ -96,63 +100,21 @@ func (c *Client) BuildAndPushImage(ctx context.Context, req BuildRequest) error 
 		return errors.New(errLine.Error)
 	}
 
-	c.logger.Infof("Building image '%s' completed successful", imageTag)
-
-	// push image
-	c.logger.Infof("Pushing image '%s'", imageTag)
-
-	ctxPush, cancel := context.WithTimeout(ctx, time.Second*120)
-	defer cancel()
-
-	var authConfig = types.AuthConfig{
-		//	Username:      "Your Docker Hub Username",
-		//	Password:      "Your Docker Hub Password or Access Token",
-		//	ServerAddress: "https://index.docker.io/v1/",
-	}
-	// receive authConfig from cli ?
-
-	authConfigBytes, _ := json.Marshal(authConfig)
-	authConfigEncoded := base64.URLEncoding.EncodeToString(authConfigBytes)
-	//c.docker.RegistryLogin()
-	tag := imageTag
-	optsPush := types.ImagePushOptions{RegistryAuth: authConfigEncoded}
-	rd, err := c.docker.ImagePush(ctxPush, tag, optsPush)
-	if err != nil {
-		return err
-	}
-
-	defer rd.Close()
-
-	err = printReader(rd)
-	if err != nil {
-		return err
-	}
-
-	c.logger.Infof("Pushing image '%s' completed successful", imageTag)
-
 	return nil
 }
 
-func printReader(rd io.Reader) error {
-	var lastLine string
+func (c *Client) pushImageExec(ctx context.Context, imageTag string) error {
+	cmd := exec.CommandContext(ctx, "docker", "image", "push", imageTag)
+	c.logger.Debug("Executing: " + cmd.String())
+	cmd.Stdout = logging.GetWriterForLevel(c.logger, logging.DebugLevel)
+	cmd.Stderr = logging.GetWriterForLevel(c.logger, logging.ErrorLevel)
 
-	scanner := bufio.NewScanner(rd)
-	for scanner.Scan() {
-		lastLine = scanner.Text()
-		fmt.Println(scanner.Text())
+	err := cmd.Run()
+	if err != nil {
+		c.logger.Error(err.Error())
 	}
 
-	errLine := &ErrorLine{}
-	json.Unmarshal([]byte(lastLine), errLine)
-	if errLine.Error != "" {
-		return errors.New(errLine.Error)
-	}
-
-	if err := scanner.Err(); err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func (c *Client) parseTagReference(imageName string) (name.Reference, error) {
